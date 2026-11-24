@@ -1,0 +1,5 @@
+# Deployment and resource isolation
+
+Production: https://syncscreen-0n6r.onrender.com (Render free, Singapore, one Node process, GitHub main auto-deploy). Render serves static frontend assets and authoritative WebSockets. No paid resources or separate database. Free workspace compute is shared; no synthetic keep-alives. Idle sleep and restarts can lose in-memory rooms. Browser smoke job uses two Chromium contexts, generates a synthetic WebM locally and leaves its own test room. It does not upload media, touch unrelated rooms or run on a schedule.
+
+Future persistence: isolated private `syncscreen` schema in Project Hub only when the project is active and migration/restore/security gates are met. Store bounded room checkpoints and hashed session tokens; never persist raw bearer credentials or uploaded movie files. Rehydrate paused state on restart; the real-time server remains authoritative. No broad service-role key in the frontend. Do not modify other schemas, auth settings or project-wide exposed schemas. Vercel frontend separation is optional, not a prerequisite; the current same-origin architecture keeps the WebSocket and browser security model simple.
