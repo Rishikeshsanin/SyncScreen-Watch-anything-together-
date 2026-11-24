@@ -5,14 +5,14 @@ import {randomBytes} from 'node:crypto';
 import {WebSocketServer,WebSocket} from 'ws';
 import {createRoom,addMember,snapshot,apply,reconcile,clean} from './core.mjs';
 const rooms=new Map(), clients=new Map();
-const assets={'/':'index.html','/app.js':'app.js','/sync.js':'sync.js','/rtc.js':'rtc.js','/style.css':'style.css','/manifest.webmanifest':'manifest.webmanifest'};
-const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json'};
+const assets={'/':'index.html','/app.js':'app.js','/sw.js':'sw.js','/icon.svg':'icon.svg','/offline.html':'offline.html','/hls.mjs':'../node_modules/hls.js/dist/hls.mjs','/sync.js':'sync.js','/rtc.js':'rtc.js','/style.css':'style.css','/manifest.webmanifest':'manifest.webmanifest'};
+const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json',mjs:'text/javascript; charset=utf-8',svg:'image/svg+xml'};
 let ice=[{urls:'stun:stun.l.google.com:19302'}];if(process.env.ICE_SERVERS)ice=JSON.parse(process.env.ICE_SERVERS);
 const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');
  res.setHeader('Cache-Control','no-store');
  const path=new URL(req.url,'http://localhost').pathname;
- if(path==='/health'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,rooms:rooms.size}));}
+ if(path==='/health'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,rooms:rooms.size,revision:process.env.RENDER_GIT_COMMIT||process.env.SYNCSCREEN_REVISION||null}));}
  if(req.method!=='GET'||!assets[path]){res.writeHead(404);return res.end('Not found');}
  try{const data=await readFile(new URL('./public/'+assets[path],import.meta.url));res.setHeader('Content-Type',types[assets[path].split('.').pop()]);res.end(data);}catch{res.writeHead(500);res.end('Unavailable');}
 });

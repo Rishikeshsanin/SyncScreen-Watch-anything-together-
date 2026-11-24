@@ -9,9 +9,10 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check public/app.js && node --check public/rtc.js && node --check public/sync.js"
+    "check": "node --check server.mjs && node --check public/app.js && node --check public/rtc.js && node --check public/sync.js && node --check public/sw.js"
   },
   "dependencies": {
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "hls.js": "1.7.4"
   }
 }

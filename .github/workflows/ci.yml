@@ -27,7 +27,7 @@ jobs:
       - run: node e2e/browser.mjs
 
   production-smoke:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/cinematic-room-and-release-checks'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/media-pwa-recovery'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -41,3 +41,4 @@ jobs:
       - run: node e2e/browser.mjs
         env:
           SYNCSCREEN_TEST_URL: https://syncscreen-0n6r.onrender.com
+          EXPECT_CINEMATIC: '1'

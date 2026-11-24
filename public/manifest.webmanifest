@@ -1,1 +1,19 @@
-{"name":"SyncScreen","short_name":"SyncScreen","start_url":"/","display":"standalone","background_color":"#10101a","theme_color":"#10101a"}
+{
+  "name": "SyncScreen",
+  "short_name": "SyncScreen",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#10101a",
+  "theme_color": "#10101a",
+  "id": "/",
+  "scope": "/",
+  "description": "Watch videos together in private synchronized rooms.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
