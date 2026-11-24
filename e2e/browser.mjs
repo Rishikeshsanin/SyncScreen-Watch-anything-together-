@@ -2,7 +2,7 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {spawn,execFileSync} from 'node:child_process';
 import {once} from 'node:events';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import net from 'node:net';
@@ -24,5 +24,14 @@ try{
  samples.sort((a,b)=>a-b);const percentile=p=>samples[Math.ceil(p*samples.length)-1];console.log(JSON.stringify({scenario:process.env.SYNCSCREEN_TEST_URL?'two Chromium contexts, native WebM, public Render WebSocket':'two Chromium contexts, native local WebM, healthy localhost',samples:samples.length,p50_ms:percentile(.5),p95_ms:percentile(.95),p99_ms:percentile(.99)}));assert.ok(percentile(.95)<750,'Browser drift smoke-test threshold exceeded');
  await host.locator('#forward').click();for(const p of [host,guest])await p.waitForFunction(()=>document.querySelector('#video').currentTime>10);
  await host.locator('#play').click();for(const p of [host,guest])await p.waitForFunction(()=>document.querySelector('#video').paused);
+ if(!process.env.SYNCSCREEN_TEST_URL){
+  // Browser-only synthetic HLS fixture; no media uploads or external provider dependency.
+  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=160x90:rate=25','-t','12','-c:v','libx264','-pix_fmt','yuv420p','-g','50','-sc_threshold','0','-an','-f','hls','-hls_time','2','-hls_playlist_type','vod','-hls_segment_filename',join(temp,'part%d.ts'),join(temp,'fixture.m3u8')]);
+  for(const p of [host,guest])await p.route('https://syncscreen-fixture.invalid/**',async route=>{const name=new URL(route.request().url()).pathname.slice(1);if(!/^(fixture\.m3u8|part\d+\.ts)$/.test(name))return route.abort();await route.fulfill({status:200,contentType:name.endsWith('.ts')?'video/mp2t':'application/vnd.apple.mpegurl',headers:{'access-control-allow-origin':'*'},body:await readFile(join(temp,name))});});
+  await host.locator('#kind').selectOption('hls');await host.locator('#url').fill('https://syncscreen-fixture.invalid/fixture.m3u8');await host.locator('#load').click();
+  for(const p of [host,guest]){await p.waitForFunction(()=>document.querySelector('#mediaTitle').textContent==='syncscreen-fixture.invalid');await p.waitForFunction(()=>document.querySelector('#video').readyState>=3,{},{timeout:30000});await p.locator('#unlock').click();await p.waitForFunction(()=>document.querySelector('#syncStatus').textContent.includes('Estimated media drift'));}
+  await host.waitForFunction(()=>document.querySelector('#people').textContent.match(/Ready/g)?.length===2);await host.locator('#play').click();for(const p of [host,guest])await p.waitForFunction(()=>!document.querySelector('#video').paused&&document.querySelector('#video').currentTime>.5);
+  console.log('HLS browser playback passed with synthetic VOD segments.');
+ }
  assert.deepEqual(errors,[]);await guest.locator('#leave').click();await host.locator('#leave').click();console.log('Browser smoke test passed: local source, guest permissions, wait mode, play, seek, pause.');
 }finally{await browser?.close();child?.kill();await rm(temp,{recursive:true,force:true});}
