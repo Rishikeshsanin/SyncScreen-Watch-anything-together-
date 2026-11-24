@@ -13,9 +13,9 @@ export function source(v){
  }
  throw Error('Unsupported source');
 }
-export function createRoom(code,now){return {code,host:null,people:new Map(),media:null,mediaGeneration:0,playback:{playing:false,position:0,at:now,version:0},mode:'catchup',waiting:false,queue:[],chat:[],updated:now};}
-export function addMember(r,name,now){if(r.people.size>=LIMIT)throw Error('Room is full');const p={id:randomUUID(),token:randomBytes(32).toString('hex'),name:clean(name,32)||'Guest',online:true,ready:false,control:false,seen:now};r.people.set(p.id,p);if(!r.host)r.host=p.id;return p;}
-export function snapshot(r){return {code:r.code,host:r.host,media:r.media,mediaGeneration:r.mediaGeneration,playback:r.playback,mode:r.mode,waiting:r.waiting,queue:r.queue,chat:r.chat,people:[...r.people.values()].map(({id,name,online,ready,control,drift})=>({id,name,online,ready,control,drift}))};}
+export function createRoom(code,now){return {code,host:null,people:new Map(),media:null,mediaGeneration:0,locked:false,limit:LIMIT,playback:{playing:false,position:0,at:now,version:0},mode:'catchup',waiting:false,queue:[],chat:[],updated:now};}
+export function addMember(r,name,now){if(r.locked)throw Error('Room is locked');if(r.people.size>=r.limit)throw Error('Room is full');const p={id:randomUUID(),token:randomBytes(32).toString('hex'),name:clean(name,32)||'Guest',online:true,ready:false,control:false,seen:now};r.people.set(p.id,p);if(!r.host)r.host=p.id;return p;}
+export function snapshot(r){return {code:r.code,host:r.host,media:r.media,mediaGeneration:r.mediaGeneration,locked:r.locked,limit:r.limit,playback:r.playback,mode:r.mode,waiting:r.waiting,queue:r.queue,chat:r.chat,people:[...r.people.values()].map(({id,name,online,ready,control,drift})=>({id,name,online,ready,control,drift}))};}
 export function leadTime(r){const rtts=[...r.people.values()].filter(p=>p.online&&Number.isFinite(p.rtt)).map(p=>p.rtt);return Math.max(350,Math.min(750,Math.ceil(Math.max(0,...rtts)*.75+120)));}
 export function setPlayback(r,playing,position,now,delay=leadTime(r)){r.playback={playing,position:Math.max(0,position),at:now+delay,version:r.playback.version+1};}
 const timeline=r=>r.media&&['youtube','direct','local'].includes(r.media.kind);
@@ -25,6 +25,7 @@ export function apply(r,p,m,now){
  if(m.type==='ready'){if(m.mediaGeneration!==r.mediaGeneration)return;p.ready=m.ready===true;p.rtt=Number.isFinite(m.rtt)?Math.max(0,Math.min(1000,m.rtt)):null;p.drift=Number.isFinite(m.drift)?Math.max(-60,Math.min(60,m.drift)):null;reconcile(r,now);return;}
  if(m.type==='chat'){const value=clean(m.text,500);if(value){r.chat.push({id:randomUUID(),name:p.name,text:value,at:now});r.chat=r.chat.slice(-80);}return;}
  if(m.type==='queue'){if(r.queue.length>=50)throw Error('Queue is full');const item=source(m.source);if(item.kind==='screen'||item.kind==='ott')throw Error('This source cannot be queued');r.queue.push(item);return;}
+ if(m.type==='roomSettings'){if(!host)throw Error('Host only');if(typeof m.locked!=='boolean'||!Number.isInteger(m.limit)||m.limit<2||m.limit>LIMIT||m.limit<r.people.size)throw Error('Invalid room settings');r.locked=m.locked;r.limit=m.limit;return;}
  if(m.type==='permission'||m.type==='transfer'||m.type==='mode'||m.type==='kick'){
   if(!host)throw Error('Host only');if(m.type==='mode'){if(!['wait','catchup'].includes(m.mode))throw Error('Invalid mode');r.mode=m.mode;if(r.mode==='catchup'&&r.waiting){r.waiting=false;setPlayback(r,true,r.playback.position,now);}reconcile(r,now);return;}
   const target=r.people.get(m.id);if(!target||target.id===p.id)throw Error('Invalid member');
