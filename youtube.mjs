@@ -8,7 +8,7 @@ export class YouTubeDiscovery{
   if(!['search','playlist'].includes(mode))throw Error('Invalid discovery mode');
   const q=mode==='playlist'?playlist(value):String(value??'').trim();
   if(!q||q.length>120)throw Error('Enter a query of 1–120 characters');
-  const now=this.now(),cacheKey=mode+':'+q.toLowerCase(),hit=this.cache.get(cacheKey);if(hit&&hit.expires>now)return hit.items;
+  const now=this.now(),cacheKey=mode+':'+(mode==='playlist'?q:q.toLowerCase()),hit=this.cache.get(cacheKey);if(hit&&hit.expires>now)return hit.items;
   const day=new Date(now).toISOString().slice(0,10);if(day!==this.day){this.day=day;this.used={search:0,playlist:0};}
   if(this.used[mode]>=(mode==='search'?60:200))throw Error('YouTube discovery daily limit reached');
   this.used[mode]++;
