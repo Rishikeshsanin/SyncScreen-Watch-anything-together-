@@ -25,3 +25,19 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
       - run: node e2e/browser.mjs
+
+  production-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/cinematic-room-and-release-checks'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+      - run: node e2e/browser.mjs
+        env:
+          SYNCSCREEN_TEST_URL: https://syncscreen-0n6r.onrender.com
