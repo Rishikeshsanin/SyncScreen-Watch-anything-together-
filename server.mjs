@@ -5,14 +5,14 @@ import {randomBytes} from 'node:crypto';
 import {WebSocketServer,WebSocket} from 'ws';
 import {createRoom,addMember,snapshot,apply,reconcile,clean,restoreNewRoom} from './core.mjs';
 const rooms=new Map(), clients=new Map();
-const assets={'/':'index.html','/app.js':'app.js','/sync.js':'sync.js','/rtc.js':'rtc.js','/style.css':'style.css','/manifest.webmanifest':'manifest.webmanifest'};
-const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json'};
+const assets={'/':'index.html','/app.js':'app.js','/sw.js':'sw.js','/icon.svg':'icon.svg','/offline.html':'offline.html','/hls.mjs':'../node_modules/hls.js/dist/hls.mjs','/sync.js':'sync.js','/rtc.js':'rtc.js','/style.css':'style.css','/manifest.webmanifest':'manifest.webmanifest'};
+const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json',mjs:'text/javascript; charset=utf-8',svg:'image/svg+xml'};
 let ice=[{urls:'stun:stun.l.google.com:19302'}];if(process.env.ICE_SERVERS)ice=JSON.parse(process.env.ICE_SERVERS);
 const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');
  res.setHeader('Cache-Control','no-store');
  const path=new URL(req.url,'http://localhost').pathname;
- if(path==='/health'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,rooms:rooms.size}));}
+ if(path==='/health'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,rooms:rooms.size,revision:process.env.RENDER_GIT_COMMIT||process.env.SYNCSCREEN_REVISION||null}));}
  if(req.method!=='GET'||!assets[path]){res.writeHead(404);return res.end('Not found');}
  try{const data=await readFile(new URL('./public/'+assets[path],import.meta.url));res.setHeader('Content-Type',types[assets[path].split('.').pop()]);res.end(data);}catch{res.writeHead(500);res.end('Unavailable');}
 });
@@ -41,7 +41,7 @@ wss.on('connection',ws=>{
     if(m.type==='join'){attach(ws,r,addMember(r,m.name,now));return;}throw Error('Join a room first');
    }
    const r=ws.room,p=ws.member;if(clients.get(p.id)!==ws||!r.people.has(p.id))throw Error('Session invalid');
-   p.seen=now;const budget={chat:8,reaction:12,queue:8,signal:30,roomSettings:6,ready:25}[m.type];if(budget){let bucket=actionWindows.get(m.type);if(!bucket||now-bucket.at>=10000){bucket={at:now,count:0};actionWindows.set(m.type,bucket);}if(++bucket.count>budget)throw Error('Action rate limit; try again shortly');}
+   p.seen=now;const budget={chat:8,reaction:12,queue:8,signal:120,roomSettings:6,ready:25,queueMove:20,queueRemove:20}[m.type];if(budget){let bucket=actionWindows.get(m.type);if(!bucket||now-bucket.at>=10000){bucket={at:now,count:0};actionWindows.set(m.type,bucket);}if(++bucket.count>budget)throw Error('Action rate limit; try again shortly');}
    if(m.type==='signal'){const target=r.people.get(m.to);if(!target?.online||target.id===p.id||!['call','screen'].includes(m.channel)||!m.data||typeof m.data!=='object'||Array.isArray(m.data)||(!m.data.description&&!m.data.candidate))throw Error('Invalid signal');if(m.channel==='screen'&&(r.media?.kind!=='screen'||(p.id!==r.host&&target.id!==r.host)))throw Error('Screen signals must involve host');if(m.data.description){const d=m.data.description;if(!['offer','answer'].includes(d.type)||typeof d.sdp!=='string'||d.sdp.length>48000)throw Error('Invalid description');}if(m.data.candidate){const c=m.data.candidate;if(typeof c.candidate!=='string'||c.candidate.length>2048)throw Error('Invalid candidate');}send(clients.get(target.id),{type:'signal',from:p.id,channel:m.channel,data:m.data});return;}
    if(m.type==='reaction'){if(!['❤️','😂','🔥','👏','😮','😢'].includes(m.emoji))throw Error('Invalid reaction');broadcast(r,{type:'reaction',emoji:m.emoji,name:p.name});return;}
    if(m.type==='leave'){r.people.delete(p.id);clients.delete(p.id);ws.close(1000,'Left');if(r.host===p.id){r.host=[...r.people.values()].find(x=>x.online)?.id||r.people.keys().next().value;if(r.media?.kind==='screen')r.media=null;}reconcile(r,now);state(r);return;}

@@ -7,7 +7,7 @@ export function source(v){
  if(v.kind==='youtube'&&/^[\w-]{11}$/.test(v.id))return {kind:v.kind,id:v.id,title:clean(v.title,120)||'YouTube video'};
  if(v.kind==='local'&&/^[a-f0-9]{64}$/.test(v.id))return {kind:v.kind,id:v.id,title:clean(v.title,120)||'Local video'};
  if(v.kind==='screen')return {kind:'screen',title:'Live screen'};
- if(['direct','ott'].includes(v.kind)){
+ if(['direct','hls','ott'].includes(v.kind)){
   const u=new URL(v.url);if(u.protocol!=='https:'||u.username||u.password||u.href.length>2048)throw Error('Use a valid HTTPS URL');
   return {kind:v.kind,url:u.href,title:clean(v.title,120)||u.hostname};
  }
@@ -19,13 +19,14 @@ export function addMember(r,name,now){if(r.locked)throw Error('Room is locked');
 export function snapshot(r){return {code:r.code,host:r.host,media:r.media,mediaGeneration:r.mediaGeneration,locked:r.locked,limit:r.limit,playback:r.playback,mode:r.mode,waiting:r.waiting,queue:r.queue,chat:r.chat,people:[...r.people.values()].map(({id,name,online,ready,control,drift})=>({id,name,online,ready,control,drift}))};}
 export function leadTime(r){const rtts=[...r.people.values()].filter(p=>p.online&&Number.isFinite(p.rtt)).map(p=>p.rtt);return Math.max(350,Math.min(750,Math.ceil(Math.max(0,...rtts)*.75+120)));}
 export function setPlayback(r,playing,position,now,delay=leadTime(r)){r.playback={playing,position:Math.max(0,position),at:now+delay,version:r.playback.version+1};}
-const timeline=r=>r.media&&['youtube','direct','local'].includes(r.media.kind);
+const timeline=r=>r.media&&['youtube','direct','hls','local'].includes(r.media.kind);
 export function reconcile(r,now){if(!timeline(r)||r.mode!=='wait')return;const blocked=[...r.people.values()].some(p=>p.online&&!p.ready);if(blocked&&r.playback.playing){r.waiting=true;setPlayback(r,false,pos(r.playback,now),now,0);}else if(!blocked&&r.waiting){r.waiting=false;setPlayback(r,true,r.playback.position,now);}}
 export function apply(r,p,m,now){
  const host=p.id===r.host, control=host||p.control;
  if(m.type==='ready'){if(m.mediaGeneration!==r.mediaGeneration)return;p.ready=m.ready===true;p.rtt=Number.isFinite(m.rtt)?Math.max(0,Math.min(1000,m.rtt)):null;p.drift=Number.isFinite(m.drift)?Math.max(-60,Math.min(60,m.drift)):null;reconcile(r,now);return;}
  if(m.type==='chat'){const value=clean(m.text,500);if(value){r.chat.push({id:randomUUID(),name:p.name,text:value,at:now});r.chat=r.chat.slice(-80);}return;}
  if(m.type==='queue'){if(r.queue.length>=50)throw Error('Queue is full');const item=source(m.source);if(item.kind==='screen'||item.kind==='ott')throw Error('This source cannot be queued');r.queue.push(item);return;}
+ if(m.type==='queueRemove'||m.type==='queueMove'){if(!control)throw Error('Playback permission required');const i=m.index;if(!Number.isInteger(i)||i<0||i>=r.queue.length)throw Error('Invalid queue index');if(m.type==='queueRemove')r.queue.splice(i,1);else{const to=m.to;if(!Number.isInteger(to)||to<0||to>=r.queue.length)throw Error('Invalid queue destination');r.queue.splice(to,0,r.queue.splice(i,1)[0]);}return;}
  if(m.type==='roomSettings'){if(!host)throw Error('Host only');if(typeof m.locked!=='boolean'||!Number.isInteger(m.limit)||m.limit<2||m.limit>LIMIT||m.limit<r.people.size)throw Error('Invalid room settings');r.locked=m.locked;r.limit=m.limit;return;}
  if(m.type==='permission'||m.type==='transfer'||m.type==='mode'||m.type==='kick'){
   if(!host)throw Error('Host only');if(m.type==='mode'){if(!['wait','catchup'].includes(m.mode))throw Error('Invalid mode');r.mode=m.mode;if(r.mode==='catchup'&&r.waiting){r.waiting=false;setPlayback(r,true,r.playback.position,now);}reconcile(r,now);return;}
