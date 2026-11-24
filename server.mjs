@@ -24,7 +24,7 @@ server.on('upgrade',(req,socket,head)=>{
 const send=(ws,o)=>{if(ws?.readyState===WebSocket.OPEN&&ws.bufferedAmount<1000000)ws.send(JSON.stringify(o));};
 function broadcast(r,o){for(const p of r.people.values())send(clients.get(p.id),o);}
 function state(r){r.updated=Date.now();broadcast(r,{type:'state',room:snapshot(r)});}
-function attach(ws,r,p){const old=clients.get(p.id);if(old&&old!==ws)old.close(4001,'Reconnected');clients.set(p.id,ws);ws.room=r;ws.member=p;p.online=true;p.seen=Date.now();send(ws,{type:'welcome',id:p.id,token:p.token,ice,room:snapshot(r)});state(r);}
+function attach(ws,r,p){const old=clients.get(p.id);if(old&&old!==ws)old.close(4001,'Reconnected');clients.set(p.id,ws);ws.room=r;ws.member=p;p.online=true;p.ready=false;p.drift=null;p.seen=Date.now();reconcile(r,p.seen);send(ws,{type:'welcome',id:p.id,token:p.token,ice,room:snapshot(r)});state(r);}
 wss.on('connection',ws=>{
  let windowStart=Date.now(),count=0;ws.alive=true;ws.on('pong',()=>ws.alive=true);
  ws.on('error',()=>{});
@@ -47,7 +47,7 @@ wss.on('connection',ws=>{
    apply(r,p,m,now);if(m.type==='kick'){clients.get(m.id)?.close(4003,'Removed');clients.delete(m.id);}state(r);
   }catch(e){send(ws,{type:'error',message:clean(e.message,160)||'Request failed'});}
  });
- ws.on('close',()=>{const p=ws.member,r=ws.room;if(p&&clients.get(p.id)===ws){clients.delete(p.id);p.online=false;p.seen=Date.now();reconcile(r,Date.now());state(r);}});
+ ws.on('close',()=>{const p=ws.member,r=ws.room;if(p&&clients.get(p.id)===ws){clients.delete(p.id);p.online=false;p.ready=false;p.drift=null;p.seen=Date.now();reconcile(r,Date.now());state(r);}});
 });
 const timer=setInterval(()=>{const now=Date.now();for(const ws of wss.clients){if(!ws.alive)ws.terminate();else{ws.alive=false;ws.ping();}}for(const [code,r] of rooms){let changed=false;for(const p of r.people.values())if(!p.online&&now-p.seen>120000){r.people.delete(p.id);changed=true;}if(!r.people.size){rooms.delete(code);continue;}if(!r.people.has(r.host)){r.host=[...r.people.values()].find(p=>p.online)?.id||r.people.keys().next().value;if(r.media?.kind==='screen')r.media=null;changed=true;}if(changed){reconcile(r,now);state(r);}}},15000);timer.unref();
 server.listen(Number(process.env.PORT)||3000,'0.0.0.0',()=>console.log('SyncScreen listening'));
