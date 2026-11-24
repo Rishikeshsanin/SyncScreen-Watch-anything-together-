@@ -14,6 +14,7 @@ export function source(v){
  throw Error('Unsupported source');
 }
 export function createRoom(code,now){return {code,host:null,people:new Map(),media:null,mediaGeneration:0,locked:false,limit:LIMIT,playback:{playing:false,position:0,at:now,version:0},mode:'catchup',waiting:false,queue:[],chat:[],updated:now};}
+export function restoreNewRoom(r,data,now){if(!data||typeof data!=='object')throw Error('Invalid recovery');const allowed=v=>{const item=source(v);if(!['youtube','local'].includes(item.kind))throw Error('This source cannot be recovered');return item;};if(!Number.isFinite(data.position)||data.position<0||data.position>864000||!Array.isArray(data.queue)||data.queue.length>50)throw Error('Invalid recovery');const media=data.media?allowed(data.media):null,queue=data.queue.map(allowed);r.media=media;r.queue=queue;r.mediaGeneration=media?1:0;setPlayback(r,false,media?data.position:0,now,0);}
 export function addMember(r,name,now){if(r.locked)throw Error('Room is locked');if(r.people.size>=r.limit)throw Error('Room is full');const p={id:randomUUID(),token:randomBytes(32).toString('hex'),name:clean(name,32)||'Guest',online:true,ready:false,control:false,seen:now};r.people.set(p.id,p);if(!r.host)r.host=p.id;return p;}
 export function snapshot(r){return {code:r.code,host:r.host,media:r.media,mediaGeneration:r.mediaGeneration,locked:r.locked,limit:r.limit,playback:r.playback,mode:r.mode,waiting:r.waiting,queue:r.queue,chat:r.chat,people:[...r.people.values()].map(({id,name,online,ready,control,drift})=>({id,name,online,ready,control,drift}))};}
 export function leadTime(r){const rtts=[...r.people.values()].filter(p=>p.online&&Number.isFinite(p.rtt)).map(p=>p.rtt);return Math.max(350,Math.min(750,Math.ceil(Math.max(0,...rtts)*.75+120)));}
@@ -30,7 +31,7 @@ export function apply(r,p,m,now){
   if(!host)throw Error('Host only');if(m.type==='mode'){if(!['wait','catchup'].includes(m.mode))throw Error('Invalid mode');r.mode=m.mode;if(r.mode==='catchup'&&r.waiting){r.waiting=false;setPlayback(r,true,r.playback.position,now);}reconcile(r,now);return;}
   const target=r.people.get(m.id);if(!target||target.id===p.id)throw Error('Invalid member');
   if(m.type==='permission')target.control=m.enabled===true;
-  if(m.type==='transfer'){if(!target.online)throw Error('Member offline');if(r.media?.kind==='screen')throw Error('Stop screen sharing before transfer');r.host=target.id;}
+  if(m.type==='transfer'){if(!target.online)throw Error('Member offline');if(r.media?.kind==='screen')throw Error('Stop screen sharing before transfer');p.control=false;target.control=false;r.host=target.id;}
   if(m.type==='kick'){r.people.delete(target.id);reconcile(r,now);}return;
  }
  if(!control)throw Error('Playback permission required');
