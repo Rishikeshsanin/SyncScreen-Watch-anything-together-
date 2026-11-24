@@ -5,3 +5,5 @@
 #queue li{padding:7px 0;overflow-wrap:anywhere}.queue-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}.queue-actions button{min-height:32px;padding:4px 9px;font-size:12px}
 
 #youtubeQuery{width:100%;margin:8px 0}#youtubeResults{max-height:340px;overflow:auto;padding-left:25px}#youtubeResults li{overflow-wrap:anywhere;padding:8px 0}#youtubeResults button{margin-left:6px;min-height:32px;font-size:12px}summary{cursor:pointer;font-weight:700}
+
+#calls audio{width:100%;min-width:0}#calls video{aspect-ratio:4/3;object-fit:cover}

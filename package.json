@@ -9,10 +9,12 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check public/app.js && node --check public/rtc.js && node --check public/sync.js && node --check public/sw.js && node --check youtube.mjs"
+    "check": "node --check server.mjs && node --check public/app.js && node --check public/rtc.js && node --check public/sync.js && node --check public/sw.js && node --check youtube.mjs && node --check calls.mjs && node --check public/calls.js"
   },
   "dependencies": {
     "ws": "^8.18.3",
-    "hls.js": "1.7.4"
+    "hls.js": "1.7.4",
+    "livekit-client": "2.25.0",
+    "livekit-server-sdk": "2.20.1"
   }
 }
