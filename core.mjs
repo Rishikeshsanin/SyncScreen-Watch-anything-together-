@@ -32,6 +32,7 @@ export function apply(r,p,m,now){
   if(m.type==='kick')r.people.delete(target.id);return;
  }
  if(!control)throw Error('Playback permission required');
+ if(m.type==='clear'){if(!host)throw Error('Host only');r.media=null;r.waiting=false;for(const q of r.people.values())q.ready=false;setPlayback(r,false,0,now,0);return;}
  if(m.type==='source'||m.type==='next'){
   if(m.type==='source'&&m.source?.kind==='screen'&&!host)throw Error('Host only');
   const item=m.type==='next'?r.queue.shift():source(m.source);if(!item)throw Error('Queue empty');r.media=item;r.waiting=false;for(const q of r.people.values())q.ready=false;setPlayback(r,false,0,now,0);return;

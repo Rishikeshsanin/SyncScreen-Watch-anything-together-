@@ -41,7 +41,7 @@ wss.on('connection',ws=>{
    }
    const r=ws.room,p=ws.member;if(clients.get(p.id)!==ws||!r.people.has(p.id))throw Error('Session invalid');
    p.seen=now;
-   if(m.type==='signal'){const target=r.people.get(m.to);if(!target?.online||!['call','screen'].includes(m.channel)||!m.data||typeof m.data!=='object')throw Error('Invalid signal');if(m.channel==='screen'&&p.id!==r.host&&target.id!==r.host)throw Error('Screen signals must involve host');send(clients.get(target.id),{type:'signal',from:p.id,channel:m.channel,data:m.data});return;}
+   if(m.type==='signal'){const target=r.people.get(m.to);if(!target?.online||!['call','screen'].includes(m.channel)||!m.data||typeof m.data!=='object')throw Error('Invalid signal');if(m.channel==='screen'&&(r.media?.kind!=='screen'||(p.id!==r.host&&target.id!==r.host)))throw Error('Screen signals must involve host');send(clients.get(target.id),{type:'signal',from:p.id,channel:m.channel,data:m.data});return;}
    if(m.type==='reaction'){if(!['❤️','😂','🔥','👏','😮','😢'].includes(m.emoji))throw Error('Invalid reaction');broadcast(r,{type:'reaction',emoji:m.emoji,name:p.name});return;}
    if(m.type==='leave'){r.people.delete(p.id);clients.delete(p.id);ws.close(1000,'Left');if(r.host===p.id){r.host=[...r.people.values()].find(x=>x.online)?.id||r.people.keys().next().value;if(r.media?.kind==='screen')r.media=null;}reconcile(r,now);state(r);return;}
    apply(r,p,m,now);if(m.type==='kick'){clients.get(m.id)?.close(4003,'Removed');clients.delete(m.id);}state(r);
